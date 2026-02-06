@@ -1,0 +1,119 @@
+{
+    "fields": [
+        {
+            "key": "id",
+            "label": "ID",
+            "type": "number"
+        },
+        {
+            "key": "name_en",
+            "label": "Name (English)",
+            "type": "string"
+        },
+        {
+            "key": "name_ar",
+            "label": "Name (Arabic)",
+            "type": "string"
+        },
+        {
+            "key": "price_wholesale",
+            "label": "Wholesale Price",
+            "type": "number"
+        },
+        {
+            "key": "price_retail",
+            "label": "Retail Price",
+            "type": "number"
+        },
+        {
+            "key": "active_ingredients",
+            "label": "Active Ingredients",
+            "type": "string"
+        },
+        {
+            "key": "image_url",
+            "label": "Image URL",
+            "type": "url"
+        },
+        {
+            "key": "category",
+            "label": "Category",
+            "type": "string"
+        },
+        {
+            "key": "manufacturer",
+            "label": "Manufacturer",
+            "type": "string"
+        },
+        {
+            "key": "dosage_form",
+            "label": "Dosage Form",
+            "type": "string"
+        },
+        {
+            "key": "package_size",
+            "label": "Package Size (Units)",
+            "type": "number"
+        },
+        {
+            "key": "barcode_primary",
+            "label": "Primary Barcode",
+            "type": "string"
+        },
+        {
+            "key": "administration_route",
+            "label": "Administration Route",
+            "type": "string"
+        },
+        {
+            "key": "description",
+            "label": "Description/Indications",
+            "type": "string"
+        },
+        {
+            "key": "product_code",
+            "label": "Product Code",
+            "type": "string"
+        },
+        {
+            "key": "timestamp",
+            "label": "Last Updated",
+            "type": "timestamp"
+        },
+        {
+            "key": "status",
+            "label": "Status",
+            "type": "string"
+        },
+        {
+            "key": "barcode_secondary",
+            "label": "Secondary Barcode",
+            "type": "string"
+        },
+        {
+            "key": "attr_1",
+            "label": "Extra Attribute 1",
+            "type": "string"
+        },
+        {
+            "key": "attr_2",
+            "label": "Extra Attribute 2",
+            "type": "string"
+        },
+        {
+            "key": "usage_instructions",
+            "label": "Usage Instructions",
+            "type": "string"
+        },
+        {
+            "key": "attr_3",
+            "label": "Extra Attribute 3",
+            "type": "string"
+        },
+        {
+            "key": "attr_4",
+            "label": "Extra Attribute 4",
+            "type": "string"
+        }
+    ]
+}
