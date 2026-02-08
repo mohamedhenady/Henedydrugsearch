@@ -225,9 +225,21 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
         raw_query = str(row.get(search_col, '')).strip()
         query = clean_for_match(raw_query)
         
-        # Use dict() to prevent the IDE from narrowing the type based on local_fields
-        result_row = dict({field: row.get(field) for field in local_fields})
+        # 1. Initialize result row with all required fields
+        result_row = {}
+        
+        # Add local fields first
+        for field in local_fields:
+            result_row[field] = row.get(field)
+        
+        # Add match metadata
         result_row['search_query'] = raw_query
+        result_row['match_found'] = "None"
+        result_row['match_score'] = 0
+        
+        # Add database fields (initialized as None)
+        for field in db_fields:
+            result_row[field] = None
 
         if query:
             is_ar = is_arabic(raw_query)
