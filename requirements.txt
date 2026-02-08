@@ -3,4 +3,3 @@ pandas
 rapidfuzz
 openpyxl
 numpy
-customtkinter
