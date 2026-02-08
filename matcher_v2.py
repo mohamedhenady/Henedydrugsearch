@@ -1,12 +1,13 @@
-import pandas as pd
+import pandas as pd # type: ignore
 import json
 import re
 import os
 import sys
-from rapidfuzz import process, fuzz, utils
+from rapidfuzz import process, fuzz, utils # type: ignore
 
 # Singleton for caching database
 _CACHED_DB = None
+_CACHED_NAMES = {"en": [], "ar": [], "id": []}
 
 def get_base_path():
     """Returns the base path for resources, compatible with scripts and EXEs."""
@@ -14,7 +15,7 @@ def get_base_path():
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
-DB_FILE = os.path.join(get_base_path(), 'druglist.json')
+DB_JSON = os.path.join(get_base_path(), 'druglist.json')
 
 STOP_WORDS = {
     'mg', 'mcg', 'ml', 'gm', 'g', 'tab', 'tabs', 'tablet', 'tablets', 'caps', 'cap', 'capsule', 
@@ -31,64 +32,66 @@ def is_arabic(text):
 def clean_for_match(text):
     if not text or pd.isna(text): return ""
     text = str(text).lower()
-    # Remove common punctuation but keep spaces
     text = re.sub(r'[^a-z0-9\u0600-\u06FF\s]', ' ', text)
     words = text.split()
-    cleaned = [w for w in words if w not in STOP_WORDS and not re.match(r'^\d+$', w)]
+    cleaned = [w for w in words if w not in STOP_WORDS]
+    if not cleaned and words:
+        return " ".join(words)
     return " ".join(cleaned)
 
 def get_master_db(status_callback=None):
-    """Loads the druglist.json database (Cached)."""
+    """Loads the database as a DataFrame directly from JSON."""
     global _CACHED_DB
     if _CACHED_DB is not None:
         return _CACHED_DB
 
-    if status_callback: status_callback("Reading database (JSON format)...")
+    if status_callback: status_callback("Loading JSON database...")
     
-    if not os.path.exists(DB_FILE):
-        raise FileNotFoundError(f"Database file missing: {DB_FILE}")
+    if not os.path.exists(DB_JSON):
+        raise FileNotFoundError(f"Database file missing: {DB_JSON}")
     
-    if os.path.getsize(DB_FILE) == 0:
-        raise ValueError("Database file is empty!")
-
-    with open(DB_FILE, 'r', encoding='utf-8') as f:
-        try:
-            obj = json.load(f)
-        except json.JSONDecodeError:
-            raise ValueError("Database file contains invalid JSON!")
-            
-    data = obj.get('data', [])
-    if not data:
-        raise ValueError("Database has no 'data' entries!")
-        
-    df = pd.DataFrame(data)
-    
-    # Pre-process for search once
-    if 'name_en' not in df.columns: df['name_en'] = ""
-    if 'name_ar' not in df.columns: df['name_ar'] = ""
-    
-    df['cleaned_en'] = df['name_en'].apply(clean_for_match)
-    df['cleaned_ar'] = df['name_ar'].apply(clean_for_match)
+    with open(DB_JSON, 'r', encoding='utf-8') as f:
+        raw_data = json.load(f)
+        data_list = raw_data.get('data', raw_data) if isinstance(raw_data, dict) else raw_data
+        df = pd.DataFrame(data_list)
     
     _CACHED_DB = df
     return df
 
+def get_search_names(status_callback=None):
+    """Retrieves cleaned names for fuzzy matching (In-Memory)."""
+    global _CACHED_NAMES
+    if _CACHED_NAMES["en"]:
+        return _CACHED_NAMES
+        
+    df = get_master_db(status_callback)
+    if status_callback: status_callback("Optimizing search index...")
+    
+    _CACHED_NAMES["en"] = [clean_for_match(str(n)) for n in df.get('name_en', [])]
+    _CACHED_NAMES["ar"] = [clean_for_match(str(n)) for n in df.get('name_ar', [])]
+    # In JSON mode, ID is just the dataframe index
+    _CACHED_NAMES["id"] = list(df.index)
+    return _CACHED_NAMES
+
 def search_live(query, limit=50):
     """
-    Search live against the cached DB.
-    Returns a list of dicts with the top matches.
+    Search live against the cached JSON DataFrame.
     """
-    db = get_master_db()
     if not query:
+        return []
+    
+    try:
+        names_data = get_search_names()
+        db_df = get_master_db()
+    except Exception as e:
+        print(f"Search index error: {e}")
         return []
         
     q_clean = clean_for_match(query)
-    is_ar = is_arabic(q_clean)
+    is_ar = is_arabic(query)
     
-    target_col = 'cleaned_ar' if is_ar else 'cleaned_en'
-    choices = db[target_col].tolist()
+    choices = names_data['ar'] if is_ar else names_data['en']
     
-    # Extract top N matches
     results = process.extract(
         q_clean,
         choices,
@@ -97,87 +100,162 @@ def search_live(query, limit=50):
         score_cutoff=50
     )
     
-    # Map back to full rows
     matches = []
     for match in results:
-        # match structure: (match_string, score, index)
         idx = match[2]
-        row = db.iloc[idx].to_dict()
-        row['_score'] = match[1] # Add score for reference
+        row_id = names_data['id'][idx]
+        row = dict(db_df.iloc[row_id])
+        row['_score'] = match[1]
         matches.append(row)
         
     return matches
 
-def get_file_headers(file_path):
-    if file_path.endswith('.xlsx'):
-        df = pd.read_excel(file_path, nrows=0)
+def safe_read_csv(file_path, **kwargs):
+    """Attempts to read a CSV or JSON file using multiple strategies."""
+    path_str = str(file_path).lower()
+    
+    # --- JSON SUPPORT ---
+    if path_str.endswith('.json'):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+            data_list = raw_data.get('data', raw_data) if isinstance(raw_data, dict) else raw_data
+            df = pd.DataFrame(data_list)
+            if 'nrows' in kwargs:
+                df = df.head(kwargs['nrows'])
+            return df
+        except Exception as e:
+            raise Exception(f"Failed to parse JSON file: {e}")
+
+    # --- CSV SUPPORT (with Deep-Dive skip-row recovery) ---
+    encodings = ['utf-8', 'utf-8-sig', 'windows-1252', 'latin1', 'cp1256']
+    delimiters = [',', ';', '\t']
+    last_error = None
+    
+    for skip in range(51):
+        for enc in encodings:
+            test_kwargs = dict(kwargs)
+            test_kwargs.pop('skiprows', None)
+            test_kwargs['nrows'] = 20 
+            
+            try:
+                # 1. Try Sniffer
+                try:
+                    df = pd.read_csv(file_path, encoding=enc, sep=None, engine='python', skiprows=skip, **test_kwargs)
+                    if not df.empty and len(df.columns) > 1:
+                        final_kwargs = dict(kwargs)
+                        final_kwargs.pop('skiprows', None)
+                        return pd.read_csv(file_path, encoding=enc, sep=None, engine='python', skiprows=skip, **final_kwargs)
+                except:
+                    pass
+
+                # 2. Try Explicit Delimiters
+                for sep in delimiters:
+                    try:
+                        df = pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **test_kwargs)
+                        if not df.empty and len(df.columns) > 1:
+                            final_kwargs = dict(kwargs)
+                            final_kwargs.pop('skiprows', None)
+                            return pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **final_kwargs)
+                    except Exception as e:
+                        last_error = e
+            except Exception as e:
+                last_error = e
+            
+    if isinstance(last_error, Exception):
+        raise last_error
+    raise Exception(f"Failed to read CSV after multiple attempts including skipping up to 50 metadata rows: {file_path}")
+
+def get_file_headers(file_path, sheet_name=0):
+    """Get column headers from a file.
+    
+    Args:
+        sheet_name: For Excel files, the sheet name or index (default: 0)
+    """
+    path_str = str(file_path).lower()
+    if path_str.endswith('.xlsx'):
+        df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=0)
     else:
-        df = pd.read_csv(file_path, nrows=0)
+        df = safe_read_csv(file_path, nrows=0)
     return df.columns.tolist()
 
-def run_matching_v2(input_path, search_col, local_fields, db_fields, output_format='xlsx', progress_callback=None, status_callback=None):
-    """
-    Super-powered matching using pre-processing and rapidfuzz.
-    """
-    # 1. Load Master DB
+def get_excel_sheets(file_path):
+    """Get list of sheet names from an Excel file."""
     try:
-        db_df = get_master_db(status_callback)
-    except Exception as e:
-        raise Exception(f"Database Error: {str(e)}")
+        xl_file = pd.ExcelFile(file_path)
+        return xl_file.sheet_names
+    except:
+        return []
 
-    # 2. Load Input File
+def run_matching_v2(input_path, search_col, local_fields, db_fields, output_format='xlsx', sheet_name=0, progress_callback=None, status_callback=None):
+    """
+    Super-powered matching using in-memory JSON data.
+    
+    Args:
+        sheet_name: For Excel files, the sheet name or index (default: 0)
+    """
+    # 1. Load Data
+    try:
+        names_data = get_search_names(status_callback)
+        db_df = get_master_db()
+    except Exception as e:
+        raise Exception(f"Data Error: {str(e)}")
+
+    # 2. Load Input
     if status_callback: status_callback("Reading input file...")
-    if input_path.endswith('.xlsx'):
-        input_df = pd.read_excel(input_path)
+    if str(input_path).lower().endswith('.xlsx'):
+        input_df = pd.read_excel(input_path, sheet_name=sheet_name)
     else:
-        input_df = pd.read_csv(input_path)
+        input_df = safe_read_csv(input_path)
+
+    # Normalize column names (strip whitespace)
+    input_df.columns = input_df.columns.str.strip()
 
     if input_df.empty:
         raise ValueError("Input file is empty!")
 
-    # 3. Optimize Search Index (Already done in get_master_db)
-    if status_callback: status_callback("Preparing search index...")
-    
-    names_en_clean = db_df['cleaned_en'].tolist()
-    names_ar_clean = db_df['cleaned_ar'].tolist()
+    # 3. Process
+    if status_callback: status_callback("Matching items (JSON In-Memory Mode)...")
     
     matched_data = []
     total = len(input_df)
-
-    # 4. Process Loop
-    if status_callback: status_callback("Matching items (Super-Powered Mode)...")
     
-    for i, row in input_df.iterrows():
+    for i, (index, row) in enumerate(input_df.iterrows()):
         raw_query = str(row.get(search_col, '')).strip()
         query = clean_for_match(raw_query)
         
-        result_row = {field: row.get(field) for field in local_fields}
+        # Use dict() to prevent the IDE from narrowing the type based on local_fields
+        result_row = dict({field: row.get(field) for field in local_fields})
         result_row['search_query'] = raw_query
 
         if query:
             is_ar = is_arabic(raw_query)
-            search_list = names_ar_clean if is_ar else names_en_clean
+            search_list = names_data['ar'] if is_ar else names_data['en']
             
-            match = process.extractOne(
-                query, 
-                search_list, 
-                scorer=fuzz.token_set_ratio,
-                score_cutoff=55
-            )
+            match = process.extractOne(query, search_list, scorer=fuzz.token_set_ratio, score_cutoff=55)
             
             if match:
                 score = match[1]
                 idx = match[2]
                 db_row = db_df.iloc[idx]
                 
-                result_row['match_found'] = db_row.get('name_en') if not is_ar else db_row.get('name_ar')
+                result_row['match_found'] = db_row['name_en'] if not is_ar else db_row['name_ar']
                 result_row['match_score'] = round(score, 2)
-                
                 for field in db_fields:
                     result_row[field] = db_row.get(field)
             else:
-                result_row['match_found'] = "No Match Found"
-                result_row['match_score'] = 0
+                # Fallback
+                match = process.extractOne(raw_query.lower(), search_list, scorer=fuzz.token_set_ratio, score_cutoff=40)
+                if match:
+                    idx = match[2]
+                    db_row = db_df.iloc[idx]
+                    result_row['match_found'] = db_row['name_en'] if not is_ar else db_row['name_ar']
+                    result_row['match_score'] = round(match[1], 2)
+                    for field in db_fields:
+                        result_row[field] = db_row.get(field)
+                else:
+                    result_row['match_found'] = "No Match Found"
+                    result_row['match_score'] = 0
         else:
             result_row['match_found'] = "Empty Query"
             result_row['match_score'] = 0

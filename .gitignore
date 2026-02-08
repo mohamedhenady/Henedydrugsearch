@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.xlsx
+~$*
+temp_input*
+matcher_v2.log
+matcher_v2_new.log
+matcher.log
+matcher_new.log
+config.json.bak
+druglist.json
