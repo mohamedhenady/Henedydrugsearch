@@ -155,7 +155,7 @@ if page == "📂 File Wizard":
                 msg_placeholder.info(f"Status: {msg}")
                 
             try:
-                output_path = matcher_v2.run_matching_v2(
+                output_path, final_df = matcher_v2.run_matching_v2(
                     "temp_input",
                      search_col,
                      local_cols,
@@ -167,12 +167,23 @@ if page == "📂 File Wizard":
                 )
                 
                 st.balloons()
-                st.success("✨ Processing Complete! Your file is ready for download.")
+                st.success("✨ Processing Complete! Previewing top results below.")
                 
+                # --- RESULTS PREVIEW ---
+                st.subheader("📋 Results Preview (Top 50)")
+                # Highlight scores and matches
+                preview_cols = ['search_query', 'match_found', 'match_score'] + db_cols
+                st.dataframe(
+                    final_df[preview_cols].head(50), 
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.markdown("---")
                 # Read output back to simplify download
                 with open(output_path, "rb") as f_out:
                     st.download_button(
-                        label="⬇️ Download Matched File",
+                        label="⬇️ Download Full Matched File",
                         data=f_out,
                         file_name=os.path.basename(output_path),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if out_fmt == "xlsx" else "application/json"

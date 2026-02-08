@@ -139,26 +139,27 @@ def safe_read_csv(file_path, **kwargs):
             test_kwargs['nrows'] = 20 
             
             try:
-                # 1. Try Sniffer
+                # 1. Try Explicit Delimiters First (More reliable than sniffer)
+                for sep in delimiters:
+                    try:
+                        df = pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **test_kwargs)
+                        if not df.empty:
+                            final_kwargs = dict(kwargs)
+                            final_kwargs.pop('skiprows', None)
+                            return pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **final_kwargs)
+                    except:
+                        pass
+
+                # 2. Try Sniffer as Fallback
                 try:
                     df = pd.read_csv(file_path, encoding=enc, sep=None, engine='python', skiprows=skip, **test_kwargs)
-                    if not df.empty and len(df.columns) > 1:
+                    if not df.empty:
                         final_kwargs = dict(kwargs)
                         final_kwargs.pop('skiprows', None)
                         return pd.read_csv(file_path, encoding=enc, sep=None, engine='python', skiprows=skip, **final_kwargs)
                 except:
                     pass
 
-                # 2. Try Explicit Delimiters
-                for sep in delimiters:
-                    try:
-                        df = pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **test_kwargs)
-                        if not df.empty and len(df.columns) > 1:
-                            final_kwargs = dict(kwargs)
-                            final_kwargs.pop('skiprows', None)
-                            return pd.read_csv(file_path, encoding=enc, sep=sep, engine='c', skiprows=skip, **final_kwargs)
-                    except Exception as e:
-                        last_error = e
             except Exception as e:
                 last_error = e
             
@@ -275,4 +276,4 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
     else:
         final_df.to_json(output_path, orient='records', force_ascii=False, indent=2)
 
-    return output_path
+    return output_path, final_df
