@@ -215,6 +215,19 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
     if input_df.empty:
         raise ValueError("Input file is empty!")
 
+    # DEBUG: Print diagnostic information
+    print(f"\n=== MATCHER DEBUG ===")
+    print(f"Input file columns: {list(input_df.columns)}")
+    print(f"Search column name: '{search_col}'")
+    print(f"Is search_col in columns?: {search_col in input_df.columns}")
+    print(f"First 3 rows of search column:")
+    if search_col in input_df.columns:
+        print(input_df[search_col].head(3).tolist())
+    else:
+        print(f"  ERROR: Column '{search_col}' not found!")
+        print(f"  Available columns: {list(input_df.columns)}")
+    print(f"=== END DEBUG ===\n")
+
     # 3. Process
     if status_callback: status_callback("Matching items (JSON In-Memory Mode)...")
     
