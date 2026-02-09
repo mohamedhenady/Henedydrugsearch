@@ -12,49 +12,104 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling
+# Custom Styling - Super Premium Theme
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@300;500;800&display=swap');
+
+    :root {
+        --primary: #00d2ff;
+        --secondary: #3a7bd5;
+        --accent: #ff00c8;
+        --bg-dark: #0a0c10;
+        --glass: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+    }
+
     .main {
-        background-color: #0e1117;
+        background: radial-gradient(circle at top right, #1a1c24, #0a0c10);
+        font-family: 'Inter', sans-serif;
     }
-    .stButton>button {
-        width: 100%;
-        border-radius: 5px;
-        height: 3em;
-        background-color: #1f6aa5;
-        color: white;
-        font-weight: bold;
-        border: none;
-        transition: 0.3s;
+
+    /* Glass Panels */
+    .stSecondaryBlock {
+        background: var(--glass) !important;
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
     }
-    .stButton>button:hover {
-        background-color: #2980b9;
-        border: none;
-        transform: translateY(-2px);
-    }
-    .stTextInput>div>div>input {
-        background-color: #1a1c24;
-        color: #ffffff;
-    }
-    .stDataFrame {
-        border: 1px solid #1f6aa5;
-        border-radius: 10px;
-    }
-    h1 {
-        color: #1f6aa5;
+
+    /* Titles */
+    h1, h2, h3 {
+        font-family: 'Outfit', sans-serif;
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         font-weight: 800 !important;
     }
-    .sidebar .sidebar-content {
-        background-image: linear-gradient(#2e3b4e,#2e3b4e);
-        color: white;
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #111827 0%, #000000 100%);
+        border-right: 1px solid var(--glass-border);
+    }
+
+    .developer-card {
+        background: rgba(0, 210, 255, 0.1);
+        border-left: 4px solid var(--primary);
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 20px;
+    }
+
+    /* Buttons */
+    .stButton>button {
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 2rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
+    }
+
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 210, 255, 0.5);
+        opacity: 0.9;
+    }
+
+    /* Inputs */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 10px !important;
+        color: white !important;
+    }
+
+    /* Dataframe Premium Border */
+    .stDataFrame {
+        border: 1px solid var(--glass-border);
+        border-radius: 15px;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3024/3024509.png", width=100)
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3024/3024509.png", width=80)
 st.sidebar.title("DrugMatch Pro")
+
+# Developer Label
+st.sidebar.markdown(f"""
+<div class="developer-card">
+    <div style="font-size: 0.8rem; color: #aaa;">DEVELOPED BY</div>
+    <div style="font-size: 1.1rem; font-weight: 800; color: #00d2ff;">Mohamed Henedy</div>
+    <div style="font-size: 0.9rem; margin-top: 5px;">📞 01025272689</div>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigation", ["📂 File Wizard", "🔍 Manual Search"])
 
@@ -74,8 +129,12 @@ else:
 
 # --- FILE WIZARD PAGE ---
 if page == "📂 File Wizard":
-    st.markdown("# 📂 File Matching Wizard")
-    st.info("Upload your Excel or CSV drug list and match it against the Master Database.")
+    st.markdown("""
+        <div style="margin-bottom: 25px;">
+            <h1 style="margin: 0; padding: 0;">📂 File Matching Wizard</h1>
+            <p style="color: #888; font-size: 1.1rem; margin-top: -5px;">Upload your Excel or CSV drug list and match it against the Master Database.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     # Step 1: Upload
     with st.container():
@@ -212,8 +271,12 @@ if page == "📂 File Wizard":
 
 # --- MANUAL SEARCH PAGE ---
 elif page == "🔍 Manual Search":
-    st.markdown("# 🔍 Manual Database Search")
-    st.write("Browse the Master Database directly with real-time fuzzy matching.")
+    st.markdown("""
+        <div style="margin-bottom: 25px;">
+            <h1 style="margin: 0; padding: 0;">🔍 Manual Database Search</h1>
+            <p style="color: #888; font-size: 1.1rem; margin-top: -5px;">Browse the Master Database directly with real-time fuzzy matching.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     query = st.text_input("Search Database", placeholder="Start typing drug name... (e.g. panadol)", label_visibility="collapsed")
     
