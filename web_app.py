@@ -6,7 +6,7 @@ import json
 
 # Page Config
 st.set_page_config(
-    page_title="Drug Matched Pro",
+    page_title="HenedyDrugSearch",
     page_icon="💊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -99,7 +99,7 @@ st.markdown("""
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3024/3024509.png", width=80)
-st.sidebar.title("DrugMatch Pro")
+st.sidebar.title("HenedyDrugSearch")
 
 # Developer Label
 st.sidebar.markdown(f"""
@@ -131,7 +131,7 @@ else:
 if page == "📂 File Wizard":
     st.markdown("""
         <div style="margin-bottom: 25px;">
-            <h1 style="margin: 0; padding: 0;">📂 File Matching Wizard</h1>
+            <h1 style="margin: 0; padding: 0;">📂 HenedyDrugSearch Wizard</h1>
             <p style="color: #888; font-size: 1.1rem; margin-top: -5px;">Upload your Excel or CSV drug list and match it against the Master Database.</p>
         </div>
     """, unsafe_allow_html=True)
