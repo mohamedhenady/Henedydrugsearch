@@ -114,8 +114,27 @@ if page == "📂 File Wizard":
         # Step 2: Configure
         st.subheader("2. Configuration")
         col1, col2 = st.columns(2)
+        # Try to guess the best column
+        best_col_idx = 0
+        search_terms = ['الصنف', 'drug', 'name', 'item', 'product', 'البند', 'الاسم']
+        for i, h in enumerate(headers):
+            if any(term in h.lower() for term in search_terms):
+                best_col_idx = i
+                break
+
         with col1:
-            search_col = st.selectbox("🎯 Target Column (Drug Name)", headers, help="The column in your file that contains the drug names to search for.")
+            search_col = st.selectbox("🎯 Target Column (Drug Name)", headers, index=best_col_idx, help="The column in your file that contains the drug names to search for.")
+            
+            # Show a small preview of the selected column to help the user
+            try:
+                if uploaded_file.name.endswith('.xlsx'):
+                    df_col_preview = pd.read_excel("temp_input", sheet_name=selected_sheet, usecols=[search_col], nrows=5)
+                else:
+                    df_col_preview = matcher_v2.safe_read_csv("temp_input", usecols=[search_col], nrows=5)
+                
+                st.caption(f"Preview of '{search_col}': {', '.join(df_col_preview[search_col].astype(str).tolist())}...")
+            except:
+                pass
             
         with col2:
             st.write("📦 Output Format")

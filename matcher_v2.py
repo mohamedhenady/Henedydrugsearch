@@ -204,7 +204,20 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
 
     # 2. Load Input
     if status_callback: status_callback("Reading input file...")
-    if str(input_path).lower().endswith('.xlsx'):
+    
+    # Smarter detection: Check extension AND binary signature
+    is_xlsx = str(input_path).lower().endswith('.xlsx')
+    if not is_xlsx and os.path.exists(input_path):
+        try:
+            with open(input_path, 'rb') as f:
+                sig = f.read(4)
+                # Check for ZIP signature (Excel files are ZIPs)
+                if sig == b'\x50\x4b\x03\x04':
+                    is_xlsx = True
+        except:
+            pass
+
+    if is_xlsx:
         input_df = pd.read_excel(input_path, sheet_name=sheet_name)
     else:
         input_df = safe_read_csv(input_path)
@@ -215,19 +228,6 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
     if input_df.empty:
         raise ValueError("Input file is empty!")
 
-    # DEBUG: Print diagnostic information
-    print(f"\n=== MATCHER DEBUG ===")
-    print(f"Input file columns: {list(input_df.columns)}")
-    print(f"Search column name: '{search_col}'")
-    print(f"Is search_col in columns?: {search_col in input_df.columns}")
-    print(f"First 3 rows of search column:")
-    if search_col in input_df.columns:
-        print(input_df[search_col].head(3).tolist())
-    else:
-        print(f"  ERROR: Column '{search_col}' not found!")
-        print(f"  Available columns: {list(input_df.columns)}")
-    print(f"=== END DEBUG ===\n")
-
     # 3. Process
     if status_callback: status_callback("Matching items (JSON In-Memory Mode)...")
     
@@ -235,7 +235,12 @@ def run_matching_v2(input_path, search_col, local_fields, db_fields, output_form
     total = len(input_df)
     
     for i, (index, row) in enumerate(input_df.iterrows()):
-        raw_query = str(row.get(search_col, '')).strip()
+        val = row.get(search_col, '')
+        if pd.isna(val) or str(val).lower() == 'nan':
+            raw_query = ""
+        else:
+            raw_query = str(val).strip()
+            
         query = clean_for_match(raw_query)
         
         # 1. Initialize result row with all required fields
