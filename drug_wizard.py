@@ -118,10 +118,11 @@ class DrugWizardApp(ctk.CTk):
         
     def _reload_db_thread(self):
         try:
-            matcher_v2.get_master_db(status_callback=lambda x: print(x))
-            messagebox.showinfo("Success", "Database loaded/reloaded successfully!")
+            matcher_v2.get_master_db(status_callback=lambda x: print(x), force_reload=True)
+            self.after(0, lambda: messagebox.showinfo("Success", "Database loaded/reloaded successfully!"))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load DB: {e}")
+            err_msg = f"Failed to load DB: {e}"
+            self.after(0, lambda msg=err_msg: messagebox.showerror("Error", msg))
 
     # ==========================
     # MODE 1: FILE WIZARD
@@ -225,19 +226,33 @@ class DrugWizardApp(ctk.CTk):
         self.status.configure(text="Processing...")
         threading.Thread(target=self.worker_run, daemon=True).start()
 
+    def _threadsafe_set_progress(self, current, total):
+        ratio = (current / total) if total else 0
+        ratio = max(0, min(1, ratio))
+        self.after(0, lambda r=ratio: self.prog.set(r))
+
+    def _threadsafe_set_status(self, message, color=None):
+        def _update():
+            kwargs = {"text": message}
+            if color is not None:
+                kwargs["text_color"] = color
+            self.status.configure(**kwargs)
+
+        self.after(0, _update)
+
     def worker_run(self):
         try:
             matcher_v2.run_matching_v2(
                 self.input_file, self.search_column_var.get(),
                 self.selected_local_fields, self.selected_db_fields,
                 self.format_var.get(),
-                progress_callback=lambda c,t: self.prog.set(c/t),
-                status_callback=lambda m: self.status.configure(text=m)
+                progress_callback=self._threadsafe_set_progress,
+                status_callback=self._threadsafe_set_status
             )
-            self.status.configure(text="Done!", text_color="green")
-            messagebox.showinfo("Success", "Finished!")
+            self._threadsafe_set_status("Done!", color="green")
+            self.after(0, lambda: messagebox.showinfo("Success", "Finished!"))
         except Exception as e:
-            self.status.configure(text=f"Error: {e}", text_color="red")
+            self._threadsafe_set_status(f"Error: {e}", color="red")
 
     # ==========================
     # MODE 2: MANUAL SEARCH
@@ -350,7 +365,8 @@ class DrugWizardApp(ctk.CTk):
             self.search_results = results
             self.after(0, self.on_search_done)
         except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Error", str(e)))
+            err_msg = str(e)
+            self.after(0, lambda msg=err_msg: messagebox.showerror("Error", msg))
             self.after(0, lambda: self.btn_search.configure(state="normal"))
 
     def on_search_done(self):
